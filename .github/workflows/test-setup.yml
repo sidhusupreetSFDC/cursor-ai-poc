@@ -1,0 +1,75 @@
+name: Test Environment Setup
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+jobs:
+  test-setup:
+    name: Test Environment Configuration
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Setup Java  
+        uses: actions/setup-java@v4
+        with:
+          java-version: '11'
+          distribution: 'temurin'
+          
+      - name: Install utilities (jq, yq)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+          
+      - name: Install Salesforce CLI
+        run: |
+          npm install -g @salesforce/cli
+          sf --version
+          
+      - name: Verify all dependencies
+        run: |
+          echo "✅ Node.js: $(node --version)"
+          echo "✅ npm: $(npm --version)"
+          echo "✅ Java: $(java --version | head -n 1)"
+          echo "✅ jq: $(jq --version)"
+          echo "✅ yq: $(yq --version)"
+          echo "✅ Salesforce CLI: $(sf --version)"
+          
+      - name: Test jq functionality
+        run: |
+          echo '{"name":"test","value":123}' | jq '.name'
+          
+      - name: Test yq functionality
+        run: |
+          echo "name: test" | yq '.name'
+          
+      - name: Display environment info
+        run: |
+          echo "Runner OS: ${{ runner.os }}"
+          echo "Runner Architecture: ${{ runner.arch }}"
+          echo "GitHub Workspace: ${{ github.workspace }}"
+          echo "GitHub Event: ${{ github.event_name }}"
+          
+      - name: Test Salesforce CLI commands
+        run: |
+          sf plugins --core
+          sf version
+
