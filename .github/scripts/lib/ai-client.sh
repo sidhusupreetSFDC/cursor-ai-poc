@@ -38,20 +38,25 @@ call_anthropic() {
         return 1
     fi
     
-    local request_body=$(cat <<EOF
-{
-  "model": "$model",
-  "max_tokens": $max_tokens,
-  "temperature": $temperature,
-  "messages": [
-    {
-      "role": "user",
-      "content": "$prompt"
-    }
-  ]
-}
-EOF
-)
+    # Properly escape the prompt for JSON using jq
+    local prompt_escaped=$(echo "$prompt" | jq -Rs .)
+    
+    local request_body=$(jq -n \
+        --arg model "$model" \
+        --argjson max_tokens "$max_tokens" \
+        --argjson temperature "$temperature" \
+        --argjson content "$prompt_escaped" \
+        '{
+            model: $model,
+            max_tokens: $max_tokens,
+            temperature: $temperature,
+            messages: [
+                {
+                    role: "user",
+                    content: $content
+                }
+            ]
+        }')
     
     local response=$(curl -s -X POST "https://api.anthropic.com/v1/messages" \
         -H "Content-Type: application/json" \
@@ -83,24 +88,29 @@ call_openai() {
         return 1
     fi
     
-    local request_body=$(cat <<EOF
-{
-  "model": "$model",
-  "messages": [
-    {
-      "role": "system",
-      "content": "You are an expert Salesforce developer and code reviewer."
-    },
-    {
-      "role": "user",
-      "content": "$prompt"
-    }
-  ],
-  "temperature": $temperature,
-  "max_tokens": $max_tokens
-}
-EOF
-)
+    # Properly escape the prompt for JSON using jq
+    local prompt_escaped=$(echo "$prompt" | jq -Rs .)
+    
+    local request_body=$(jq -n \
+        --arg model "$model" \
+        --argjson temperature "$temperature" \
+        --argjson max_tokens "$max_tokens" \
+        --argjson user_content "$prompt_escaped" \
+        '{
+            model: $model,
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert Salesforce developer and code reviewer."
+                },
+                {
+                    role: "user",
+                    content: $user_content
+                }
+            ],
+            temperature: $temperature,
+            max_tokens: $max_tokens
+        }')
     
     local response=$(curl -s -X POST "https://api.openai.com/v1/chat/completions" \
         -H "Content-Type: application/json" \
