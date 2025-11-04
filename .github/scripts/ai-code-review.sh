@@ -14,22 +14,13 @@
 #                            or directory containing Apex classes
 #
 # Environment Variables:
-#   ANTHROPIC_API_KEY or OPENAI_API_KEY: Required for AI analysis
-#   AI_PROVIDER: anthropic or openai (default: anthropic)
+#   CURSOR_API_KEY, ANTHROPIC_API_KEY, or OPENAI_API_KEY: Required for AI analysis
+#   AI_PROVIDER: cursor, anthropic, or openai (default: cursor)
 #   AI_CONFIG_FILE: Path to AI configuration file
+#   CURSOR_API_URL: Cursor API endpoint (default: https://api.cursor.sh/v1)
 ##############################################################################
 
 set -e
-
-# Source the AI client library
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-
-# Export AI_PROVIDER before sourcing if set in environment
-if [ -n "$AI_PROVIDER" ]; then
-    export AI_PROVIDER
-fi
-
-source "$SCRIPT_DIR/lib/ai-client.sh"
 
 # Colors
 RED='\033[0;31m'
@@ -44,19 +35,29 @@ AI_CONFIG_FILE="${AI_CONFIG_FILE:-.github/config/ai-config.yml}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-.github/config/prompts/apex-code-review.md}"
 OUTPUT_FILE="${OUTPUT_FILE:-review-results.json}"
 
-# Override provider from config file if not set in environment
-if [ -z "$AI_PROVIDER" ] && [ -f "$AI_CONFIG_FILE" ]; then
-    AI_PROVIDER=$(yq eval '.provider' "$AI_CONFIG_FILE" 2>/dev/null || echo "anthropic")
+# Determine AI provider BEFORE sourcing the library
+# Priority: 1) Environment variable, 2) Config file, 3) Default to cursor
+if [ -n "$AI_PROVIDER" ]; then
+    # Use environment variable if set
+    export AI_PROVIDER
+elif [ -f "$AI_CONFIG_FILE" ]; then
+    # Read from config file
+    AI_PROVIDER=$(yq eval '.provider' "$AI_CONFIG_FILE" 2>/dev/null || echo "cursor")
+    export AI_PROVIDER
+else
+    # Default to cursor
+    AI_PROVIDER="cursor"
     export AI_PROVIDER
 fi
 
-# Default to anthropic if still not set
-AI_PROVIDER="${AI_PROVIDER:-anthropic}"
-export AI_PROVIDER
+# Source the AI client library AFTER setting AI_PROVIDER
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/ai-client.sh"
 
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  AI-Powered Apex Code Review${NC}"
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}Using AI Provider: $AI_PROVIDER${NC}"
 echo ""
 
 # Validate input

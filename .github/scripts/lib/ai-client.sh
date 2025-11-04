@@ -18,12 +18,15 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-# Default configuration
-AI_PROVIDER="${AI_PROVIDER:-cursor}"
-AI_MODEL="${AI_MODEL:-claude-3-5-sonnet-20241022}"
-AI_TEMPERATURE="${AI_TEMPERATURE:-0.2}"
-AI_MAX_TOKENS="${AI_MAX_TOKENS:-4096}"
-CURSOR_API_URL="${CURSOR_API_URL:-https://api.cursor.sh/v1}"
+# Default configuration (only set if not already set by calling script)
+: "${AI_PROVIDER:=cursor}"
+: "${AI_MODEL:=claude-3-5-sonnet-20241022}"
+: "${AI_TEMPERATURE:=0.2}"
+: "${AI_MAX_TOKENS:=4096}"
+: "${CURSOR_API_URL:=https://api.cursor.sh/v1}"
+
+# Export them
+export AI_PROVIDER AI_MODEL AI_TEMPERATURE AI_MAX_TOKENS CURSOR_API_URL
 
 ##############################################################################
 # Function: Call Anthropic Claude API

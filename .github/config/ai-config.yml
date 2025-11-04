@@ -2,9 +2,9 @@
 # This file configures the AI provider and model settings for automated code review
 
 # AI Provider Configuration
-provider: anthropic # Options: anthropic, openai
+provider: cursor # Options: cursor, anthropic, openai
 model:
-  claude-3-5-sonnet-20241022 # For Anthropic: claude-3-5-sonnet-20241022, claude-3-haiku-20240307
+  claude-3-5-sonnet-20241022 # For Cursor/Anthropic: claude-3-5-sonnet-20241022, claude-3-haiku-20240307
   # For OpenAI: gpt-4o, gpt-4o-mini
 
 # Model Parameters
