@@ -19,10 +19,11 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 # Default configuration
-AI_PROVIDER="${AI_PROVIDER:-anthropic}"
+AI_PROVIDER="${AI_PROVIDER:-cursor}"
 AI_MODEL="${AI_MODEL:-claude-3-5-sonnet-20241022}"
 AI_TEMPERATURE="${AI_TEMPERATURE:-0.2}"
 AI_MAX_TOKENS="${AI_MAX_TOKENS:-4096}"
+CURSOR_API_URL="${CURSOR_API_URL:-https://api.cursor.sh/v1}"
 
 ##############################################################################
 # Function: Call Anthropic Claude API
@@ -128,6 +129,62 @@ call_openai() {
 }
 
 ##############################################################################
+# Function: Call Cursor API
+##############################################################################
+call_cursor() {
+    local prompt="$1"
+    local model="${2:-$AI_MODEL}"
+    local temperature="${3:-$AI_TEMPERATURE}"
+    local max_tokens="${4:-$AI_MAX_TOKENS}"
+    
+    if [ -z "$CURSOR_API_KEY" ]; then
+        echo -e "${RED}Error: CURSOR_API_KEY not set${NC}" >&2
+        echo -e "${YELLOW}Note: Cursor API is currently in beta. Get your key from Cursor settings.${NC}" >&2
+        echo -e "${YELLOW}Alternative: Use ANTHROPIC_API_KEY or OPENAI_API_KEY instead.${NC}" >&2
+        return 1
+    fi
+    
+    # Properly escape the prompt for JSON using jq
+    local prompt_escaped=$(echo "$prompt" | jq -Rs .)
+    
+    # Cursor API uses OpenAI-compatible format
+    local request_body=$(jq -n \
+        --arg model "$model" \
+        --argjson temperature "$temperature" \
+        --argjson max_tokens "$max_tokens" \
+        --argjson user_content "$prompt_escaped" \
+        '{
+            model: $model,
+            messages: [
+                {
+                    role: "system",
+                    content: "You are an expert Salesforce developer and code reviewer with deep knowledge of Apex, Lightning Web Components, and Salesforce best practices."
+                },
+                {
+                    role: "user",
+                    content: $user_content
+                }
+            ],
+            temperature: $temperature,
+            max_tokens: $max_tokens
+        }')
+    
+    local response=$(curl -s -X POST "$CURSOR_API_URL/chat/completions" \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $CURSOR_API_KEY" \
+        -d "$request_body")
+    
+    # Check for errors
+    if echo "$response" | jq -e '.error' > /dev/null 2>&1; then
+        echo -e "${RED}API Error:${NC}" >&2
+        echo "$response" | jq '.error' >&2
+        return 1
+    fi
+    
+    echo "$response"
+}
+
+##############################################################################
 # Function: Parse AI response (provider-agnostic)
 ##############################################################################
 parse_ai_response() {
@@ -138,7 +195,7 @@ parse_ai_response() {
         anthropic)
             echo "$response" | jq -r '.content[0].text'
             ;;
-        openai)
+        openai|cursor)
             echo "$response" | jq -r '.choices[0].message.content'
             ;;
         *)
@@ -166,6 +223,9 @@ ai_call() {
     
     local response
     case "$AI_PROVIDER" in
+        cursor)
+            response=$(call_cursor "$prompt" "$AI_MODEL" "$AI_TEMPERATURE" "$AI_MAX_TOKENS")
+            ;;
         anthropic|claude)
             response=$(call_anthropic "$prompt" "$AI_MODEL" "$AI_TEMPERATURE" "$AI_MAX_TOKENS")
             ;;
@@ -174,7 +234,7 @@ ai_call() {
             ;;
         *)
             echo -e "${RED}Error: Unknown AI provider '$AI_PROVIDER'${NC}" >&2
-            echo "Supported providers: anthropic, openai" >&2
+            echo "Supported providers: cursor, anthropic, openai" >&2
             return 1
             ;;
     esac

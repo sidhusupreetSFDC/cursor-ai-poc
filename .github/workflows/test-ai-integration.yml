@@ -6,9 +6,10 @@ on:
       provider:
         description: "AI Provider"
         required: true
-        default: "anthropic"
+        default: "cursor"
         type: choice
         options:
+          - cursor
           - anthropic
           - openai
       test_file:
@@ -75,6 +76,16 @@ jobs:
         run: |
           echo "Files to review:"
           cat files-to-review.txt
+
+      - name: Run AI Code Review (Cursor)
+        if: ${{ inputs.provider == 'cursor' }}
+        env:
+          CURSOR_API_KEY: ${{ secrets.CURSOR_API_KEY }}
+          AI_PROVIDER: cursor
+        run: |
+          chmod +x .github/scripts/ai-code-review.sh
+          chmod +x .github/scripts/lib/ai-client.sh
+          ./.github/scripts/ai-code-review.sh files-to-review.txt || true
 
       - name: Run AI Code Review (Anthropic)
         if: ${{ inputs.provider == 'anthropic' }}
