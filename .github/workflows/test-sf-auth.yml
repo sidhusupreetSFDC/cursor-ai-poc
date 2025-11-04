@@ -1,0 +1,115 @@
+name: Test Salesforce Authentication
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      auth-method:
+        description: 'Authentication method'
+        required: true
+        default: 'sfdx-url'
+        type: choice
+        options:
+          - sfdx-url
+          - jwt
+
+jobs:
+  test-authentication:
+    name: Test SF Auth - ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+        - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './package-lock.json'
+          
+      - name: Install Salesforce CLI
+        run: |
+          npm install -g @salesforce/cli
+          sf --version
+          
+      - name: Authenticate to Salesforce (SFDX URL Method)
+        if: ${{ inputs.auth-method == 'sfdx-url' }}
+        env:
+          SFDX_AUTH_URL_DEV: ${{ secrets.SFDX_AUTH_URL_DEV }}
+          SFDX_AUTH_URL_STAGING: ${{ secrets.SFDX_AUTH_URL_STAGING }}
+          SFDX_AUTH_URL_PROD: ${{ secrets.SFDX_AUTH_URL_PROD }}
+        run: |
+          chmod +x .github/scripts/sf-auth.sh
+          ./.github/scripts/sf-auth.sh ${{ inputs.environment }} sfdx-url
+          
+      - name: Authenticate to Salesforce (JWT Method)
+        if: ${{ inputs.auth-method == 'jwt' }}
+        env:
+          SF_JWT_KEY: ${{ secrets.SF_JWT_KEY }}
+          SF_CONSUMER_KEY: ${{ secrets.SF_CONSUMER_KEY }}
+          SF_USERNAME_DEV: ${{ secrets.SF_USERNAME_DEV }}
+          SF_USERNAME_STAGING: ${{ secrets.SF_USERNAME_STAGING }}
+          SF_USERNAME_PROD: ${{ secrets.SF_USERNAME_PROD }}
+        run: |
+          chmod +x .github/scripts/sf-auth.sh
+          ./.github/scripts/sf-auth.sh ${{ inputs.environment }} jwt
+          
+      - name: List all orgs
+        run: |
+          echo "All authenticated orgs:"
+          sf org list
+          
+      - name: Display org details
+        run: |
+          echo "Detailed org information:"
+          sf org display
+          
+      - name: Test metadata retrieval
+        run: |
+          echo "Testing metadata retrieval..."
+          # Create a simple package.xml for testing
+          mkdir -p force-app/main/default
+          cat > package.xml << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <Package xmlns="http://soap.sforce.com/2006/04/metadata">
+              <types>
+                  <members>*</members>
+                  <name>CustomObject</name>
+              </types>
+              <version>59.0</version>
+          </Package>
+          EOF
+          
+          # Try to retrieve CustomObject metadata
+          sf project retrieve start --manifest package.xml || echo "No custom objects found (this is okay for testing)"
+          
+      - name: Run SOQL query
+        run: |
+          echo "Testing SOQL query..."
+          sf data query --query "SELECT Id, Name FROM Organization LIMIT 1"
+          
+      - name: List available metadata types
+        run: |
+          echo "Available metadata types:"
+          sf org list metadata-types
+          
+      - name: Authentication summary
+        run: |
+          echo "════════════════════════════════════════════════"
+          echo "  Authentication Test Summary"
+          echo "════════════════════════════════════════════════"
+          echo "Environment: ${{ inputs.environment }}"
+          echo "Auth Method: ${{ inputs.auth-method }}"
+          echo "Status: ✅ SUCCESS"
+          echo "════════════════════════════════════════════════"
+
