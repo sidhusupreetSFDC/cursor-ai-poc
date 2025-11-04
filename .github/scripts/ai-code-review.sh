@@ -23,6 +23,12 @@ set -e
 
 # Source the AI client library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Export AI_PROVIDER before sourcing if set in environment
+if [ -n "$AI_PROVIDER" ]; then
+    export AI_PROVIDER
+fi
+
 source "$SCRIPT_DIR/lib/ai-client.sh"
 
 # Colors
@@ -37,6 +43,16 @@ INPUT="$1"
 AI_CONFIG_FILE="${AI_CONFIG_FILE:-.github/config/ai-config.yml}"
 PROMPT_TEMPLATE="${PROMPT_TEMPLATE:-.github/config/prompts/apex-code-review.md}"
 OUTPUT_FILE="${OUTPUT_FILE:-review-results.json}"
+
+# Override provider from config file if not set in environment
+if [ -z "$AI_PROVIDER" ] && [ -f "$AI_CONFIG_FILE" ]; then
+    AI_PROVIDER=$(yq eval '.provider' "$AI_CONFIG_FILE" 2>/dev/null || echo "anthropic")
+    export AI_PROVIDER
+fi
+
+# Default to anthropic if still not set
+AI_PROVIDER="${AI_PROVIDER:-anthropic}"
+export AI_PROVIDER
 
 echo -e "${BLUE}════════════════════════════════════════════════${NC}"
 echo -e "${BLUE}  AI-Powered Apex Code Review${NC}"
